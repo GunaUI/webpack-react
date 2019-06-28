@@ -130,6 +130,7 @@ npm install --save-dev css-loader style-loader
                     {
                         loader : 'css-loader',
                         options : {
+                            importLoaders : 1,
                             modules : true,
                             localIdentName: '[name]_[local]_[hash:base64:5]'
                         }
@@ -175,3 +176,202 @@ npm install --save-dev autoprefixer
 
 * so here I'll add autoPrefixer and this is actually a function we need to execute and we pass a javascript object to it to configure
 it and there again we pass a list of browsers, so browsers is a list and we can take the list we set up in babelrc, that's the browser list I want to support, I'll just paste it into the browser's list for the autoPrefixer.So now we prefix css as required for these browsers we support and it will automatically figure out which browsers these are for us.
+
+* Now since we run one additional loader before css loader, we actually need to inform css loader about that, that's just a special set up css loader needs. So there I'll add import loaders and set this to one because we run one loader before css loaderis applied.
+### Creating rule for images.
+```jsx
+{
+    test: /\.(png|jpe?g|gif)$/,
+    loader: 'url-loader?limit=7000&name=images/[name].[ext]' 
+}
+```
+* And for these files, I want to use a loader we have to install 
+```jsx
+sudo npm install --save-dev url-loader
+```
+* Now the URL loader is a loader which will take our images and if they are below a certain limit we define, it will actually convert them into data 64 URLs which it can inline into our documents,so we don't have to download extra file. 
+* so we don't have to download extra file. But for bigger files, it would be inefficient so files above that limit we specify will simply be copied to our output folder and it will then generate a link to these files and put that into our import we use in our components.
+* What we do here is we use the URL loader here but now we configure it with query params and we do it with query params so that the configuration
+here, it gets automatically passed onto a fallback we will use if the limit is exceeded.
+* Now that fallback is another loader we also need to install though
+```jsx
+ npm install --save-dev file-loader
+```
+* Now that is a loader which in the end simply copies the file you could say, because it copies it into a new direction and gives us a link to it
+and that is the fallback we'll use automatically here if we exceed the limit we now define here. As a query param, limit could be let's say 7000b.
+* So the image is going to get copied into that folder, in our dist folder because that output set up is taken into account even though we're not
+creating a bundle.js file but the path still is taken into account,
+### Lazy loading 
+* now I want to have a look at plugins and then see if the setup actually works.
+* we don't need any for development workflow, we will add one later when we set this up for production, there I want to add some plugin but for now that is all, I won't add a plugin here.
+* if we run our start script which runs the dev server which I said would automatically take this config file.
+* We need to adjust our setup here to be able to create dynamically generated extra chunks of code,
+* lazy loading means that it's an extra bundle and not part of the main bundle which is downloaded initially,
+to support code splitting in webpack and code splitting is just a different name for lazy loading,I have to add chunkFileName here to my output config.
+
+### Injecting the Script into the index.html File
+* we need to connect our index.html file to the output files which are generated, when using the dev server they are only stored
+in memory but they're still generated. We need to install a webpack plugin for that,
+```jsx
+sudo npm install --save-dev html-webpack-plugin
+```
+* this is a special plugin which allows to connect our html file with our output and webpack will do that automatically and inject our bundled script and so on into that html file.
+* we have to add config for html-webpack-plugin in webpack.config.js
+```jsx
+plugins: [
+        new HtmlWebpackPlugin({
+            template: __dirname + '/src/index.html',
+            filename: 'index.html',
+            inject: 'body'
+        })
+    ]
+```
+### Creating the Production Workflow
+* for production workflow let follow the below steps.  in my package.json file, I want to have a second script,
+let's name it build.
+```jsx
+"scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "webpack-dev-server",
+    "build": "webpack"
+  },
+```
+* This will create a dist folder inside the root folder which will have all you image,css and other JS files.. this certainly isn't the code we want to ship.
+* The goal instead is to have a dedicated workflow for production which does some optimizations.
+* Let us add new config file webpack.prod.config.js
+```js
+const path = require('path');
+const autoprefixer = require('autoprefixer');
+const HtmlWebpackPlugin = require('html-webpack-plugin');
+const webpack = require(webpack);
+module.exports = {
+    devtool : 'cheap-module-source-map',
+    entry : './src/index.js',
+    output: {
+        path :path.resolve(__dirname, 'dist'),
+        filename : 'bundle.js',
+        chunkFilename: '[id].js',
+        publicPath : ''
+    },
+    resolve: {
+        extensions: ['.js', '.jsx'],
+    },
+    module: {
+        rules: [
+            {
+                test: /\.js$/,
+                loader: 'babel-loader',
+                exclude: /node_modules/
+            },
+            {
+                test: /\.css$/,
+                use: [
+                    {
+                        loader : 'style-loader'
+                    },
+                    {
+                        loader : 'css-loader',
+                        options : {
+                            importLoaders : 1,
+                            modules: {
+                                mode: 'local',
+                                localIdentName: '[local]--[hash:base64:5]'
+                            }
+                        },
+                    },
+                    {
+                        loader : 'postcss-loader',
+                        options : {
+                            ident: 'postcss',
+                            plugins: () => [
+                                autoprefixer({
+                                    browsers: [
+                                        "> 1%",
+                                        "last 2 versions"
+                                    ]
+                                })
+                            ]
+                        }
+                    },
+                ],
+                exclude: /node_modules/
+            },
+            {
+                test: /\.(png|jpe?g|gif)$/,
+                loader: 'url-loader?limit=7000&name=images/[name].[ext]' 
+            }
+        ]
+    },
+    plugins: [
+        new HtmlWebpackPlugin({
+            template: __dirname + '/src/index.html',
+            filename: 'index.html',
+            inject: 'body'
+        }),
+        new webpack.optimize.UglifyJsPlugin()
+    ]
+
+}
+```
+* the dev tool, here I'll remove the eval to create more optimal source maps which are less resource intensive,you can then always decide whether you want to deploy them or not but it's nice to have source maps here too to quickly find some bugs in the production workflow, if there are any.
+* now there we have a plugin for connecting the html file and I want to keep that, what I want to do now is I also want to uglify my output, I want to optimize it and that actually is a plugin that's built into webpack, we don't need to install it. its already there in webpack so..
+```jsx
+const webpack = require('webpack');
+
+ plugins: [
+        new HtmlWebpackPlugin({
+            template: __dirname + '/src/index.html',
+            filename: 'index.html',
+            inject: 'body'
+        }),
+        new webpack.optimize.UglifyJsPlugin()
+    ]
+```
+* For production add exact production config in build script.
+```jsx
+"scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "webpack-dev-server",
+    "build": "rimraf dist && webpack --config webpack.prod.config.js --progess --profile --color"
+  },
+```
+* Then we need to install one more plugin.
+```jsx
+sudo npm install --save-dev rimraf
+```
+* it allows us to delete a folder or files and I want to delete the dist folder at the start of every build process so that we create a brand new one.
+
+### Note 
+
+Adding babel-polyfill
+The current setup won't support all browsers theoretically supported by React. Features like Promises and Object.assign()  are missing in older browsers - especially in IE of course.
+
+If you need to support these browsers, you need to add a polyfill (a package which provides these features for older browsers). babel-polyfill  is a great and easy-to-use choice.
+
+Add it like this:
+```jsx
+npm install --save babel-polyfill 
+```
+
+Add the following import to the top of your index.js file:
+```jsx
+import 'babel-polyfill';
+```
+Change the config of your env  babel preset in the .babelrc  file: 
+```jsx
+"presets": [
+    ["env", {
+        "targets": {
+            "browsers": [
+                "> 1%",
+                "last 2 versions"
+            ]
+        },
+        "useBuiltIns": "entry"
+     }],
+     "stage-2",
+     "react"
+ ],
+ ```
+useBuiltIns  was added and by setting it to 'entry' , the import in the index.js  file (import 'babel-polyfill' ) is actually changed to import whatever features need to be supported for your chosen browsers and environment. More information can be found here: https://github.com/babel/babel-preset-env#usebuiltins-entry
+

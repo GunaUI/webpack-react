@@ -1,8 +1,10 @@
 const path = require('path');
 const autoprefixer = require('autoprefixer');
-const HtmlWebpackPlugin = require('html-webpack-plugin')
+const HtmlWebpackPlugin = require('html-webpack-plugin');
+// const webpack = require('webpack');
+const UglifyJsPlugin = require("uglifyjs-webpack-plugin");
 module.exports = {
-    devtool : 'cheap-module-eval-source-map',
+    devtool : 'cheap-module-source-map',
     entry : './src/index.js',
     output: {
         path :path.resolve(__dirname, 'dist'),
@@ -64,7 +66,8 @@ module.exports = {
             template: __dirname + '/src/index.html',
             filename: 'index.html',
             inject: 'body'
-        })
+        }),
+        new UglifyJsPlugin()
     ]
 
 }

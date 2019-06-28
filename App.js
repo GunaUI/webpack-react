@@ -1,11 +1,11 @@
 import React, { Component } from 'react';
 import { Link, Route } from 'react-router-dom';
 
-import Users from './containers/Users';
-import asyncComponent from './hoc/asyncComponent';
+import Users from './src/container/User';
+import asyncComponent from './src/hoc/asyncComponent';
 
 const AsyncPizza = asyncComponent(() => {
-    return import('./containers/Pizza.js');
+    return import('./src/container/Pizza.js');
 });
 
 class App extends Component {
@@ -24,3 +24,4 @@ class App extends Component {
         );
     }
 }
+export default App;
